@@ -172,13 +172,13 @@ static gboolean dir_match_size(GKeyFile *kf, gchar *subdir, gint icon_size) {
 			min = size;
 		if((max = g_key_file_get_integer(kf, subdir, "MaxSize", NULL)) == 0)
 			max = size;
-		return min <= icon_size <= max;
+		return (min <= icon_size) && (icon_size <= max);
 	}
 	else if(g_strcmp0(type, "Threshold") == 0) {
 		g_free(type);
 		if((thresh = g_key_file_get_integer(kf, subdir, "Threshold", NULL)) == 0)
 			thresh = 2;
-		return size - thresh <= icon_size <= size + thresh;
+		return (size - thresh <= icon_size) && (icon_size <= size + thresh);
 	}
 	g_free(type);
 	return FALSE;

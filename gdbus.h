@@ -21,7 +21,8 @@ typedef struct ItemData {
 	gchar *status;
 	guint32 win_id;
 	gchar *icon_name;
-	gchar *icon_path;
+	gchar *icon_path; //NOT theme_path
+	gchar *theme_path;
 	Pixmap *icon_pixmap;
 	gchar *overlay_name;
 	gchar *att_name;
