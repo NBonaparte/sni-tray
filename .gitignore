@@ -39,6 +39,7 @@
 *.x86_64
 *.hex
 sni-tray
+test-window
 
 # Debug files
 *.dSYM/

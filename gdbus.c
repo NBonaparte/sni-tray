@@ -4,7 +4,6 @@
  * Icons can be specified by name, not path
  */
 static void on_watch_sig_changed(GDBusProxy *p, gchar *sender_name, gchar *signal_name, GVariant *param, gpointer user_data);
-static inline gboolean apply_cached_prop_string(GDBusProxy *p, const gchar *name, gchar **output);
 static void on_item_sig_changed(GDBusProxy *p, gchar *sender_name, gchar *signal_name, GVariant *param, gpointer user_data);
 static void init_item_data(const gchar *name, const gchar *path, ItemData *data);
 static void watcher_appeared_handler(GDBusConnection *c, const gchar *name, const gchar *sender, gpointer user_data);
@@ -82,24 +81,7 @@ static gchar * get_property_string(GDBusProxy *p, gchar *prop) {
 	}
 	return retstr;
 }
-//TODO check no string mem leaks (excessive duplication)
-static inline gboolean apply_cached_prop_string(GDBusProxy *p, const gchar *name, gchar **output) {
-	//const gchar *str;
-	GVariant *var = g_dbus_proxy_get_cached_property(p, name);
-	if(var != NULL) {
-		//g_free(output);
-		//str = g_variant_get_string(var, NULL);
-		//output = (gchar *) g_variant_get_string(var, NULL);
-		*output = g_variant_dup_string(var, NULL);
-		//printf("%s: '%s'\n", name, str);
-		printf("%s: '%s'\n", name, *output);
-		//output = g_strdup(str);
-		g_variant_unref(var);
-		return TRUE;
-	}
-	output = NULL;
-	return FALSE;
-}
+
 static inline void ensure_icon_path(GDBusProxy *p, gchar *icon, gchar **output) {
 	printf("%s %s\n", icon, *output);
 	if((icon != NULL) && (*output == NULL)) {
@@ -131,28 +113,23 @@ static void on_item_sig_changed(GDBusProxy *p, gchar *sender_name, gchar *signal
 	//const gchar *prop;
 	printf("Item %s emitted signal %s\n", sender_name, signal_name);
 	if(g_strcmp0(signal_name, "NewTitle") == 0) {
-		//apply_cached_prop_string(p, "Title", &(data->title));
 		data->title = get_property_string(p, "Title");
 		printf("New title: %s\n", data->title);
 	}
 	else if(g_strcmp0(signal_name, "NewIcon") == 0) {
-		//if(apply_cached_prop_string(p, "IconName", &(data->icon_name)))
 		if((data->icon_name = get_property_string(p, "IconName")) != NULL)
 			ensure_icon_path(p, data->icon_name, &(data->icon_path));
-		//apply_cached_prop_string(p, "IconThemePath", data->icon_path);
 		apply_cached_prop_pixmap(p, "IconPixmap", &(data->icon_pixmap));
 		printf("New icon name: %s\n", data->icon_name);
 	}
 	else if(g_strcmp0(signal_name, "NewAttentionIcon") == 0) {
 		//maybe check for pixmap and/or movie too
 		data->att_name = get_property_string(p, "AttentionIconName");
-		//apply_cached_prop_string(p, "AttentionIconName", &(data->att_name));
 		printf("New attention icon name: %s\n", data->att_name);
 	}
 	else if(g_strcmp0(signal_name, "NewOverlayIcon") == 0) {
 		//maybe check for pixmap too
 		data->overlay_name = get_property_string(p, "OverlayIconName");
-		//apply_cached_prop_string(p, "OverlayIconName", &(data->overlay_name));
 		printf("New overlay icon name: %s\n", data->overlay_name);
 	}
 	else if(g_strcmp0(signal_name, "NewToolTip") == 0) {
@@ -163,7 +140,6 @@ static void on_item_sig_changed(GDBusProxy *p, gchar *sender_name, gchar *signal
 	}
 	else if(g_strcmp0(signal_name, "NewStatus") == 0) {
 		data->status = get_property_string(p, "Status");
-		//apply_cached_prop_string(p, "OverlayIconName", &(data->status));
 		printf("New status: %s\n", data->status);
 	}
 	g_free(item);
@@ -180,32 +156,20 @@ static void init_item_data(const gchar *name, const gchar *path, ItemData *data)
 
 	data->dbus_name = g_strdup(name);
 
-	//apply_cached_prop_string(proxy, "Category", &(data->category));
 	data->category = get_property_string(proxy, "Category");
-	//apply_cached_prop_string(proxy, "Id", &(data->id));
 	data->id = get_property_string(proxy, "Id");
-	//apply_cached_prop_string(proxy, "Title", &(data->title));
 	data->title = get_property_string(proxy, "Title");
-	//apply_cached_prop_string(proxy, "Status", &(data->status));
 	data->status = get_property_string(proxy, "Status");
 	//windowid
-	//if(apply_cached_prop_string(proxy, "IconName", &(data->icon_name))) {
-	//	ensure_icon_path(proxy, data->icon_name, &(data->icon_path));
-	//}
 	printf("%s\n", get_property_string(proxy, "IconName"));
 	if((data->icon_name = get_property_string(proxy, "IconName")) != NULL) {
 		printf("%s\n", data->icon_name);
 		ensure_icon_path(proxy, data->icon_name, &(data->icon_path));
 	}
-	//apply_cached_prop_string(proxy, "IconThemePath", &(data->theme_path));
 	data->theme_path = get_property_string(proxy, "IconThemePath");
 	apply_cached_prop_pixmap(proxy, "IconPixmap", &(data->icon_pixmap));
-	//data->icon_pixmap = g_strdup(get_property_string(proxy, "IconPixmap"));
-	//apply_cached_prop_string(proxy, "OverlayIconName", &(data->overlay_name));
 	data->overlay_name = get_property_string(proxy, "OverlayIconName");
-	//apply_cached_prop_string(proxy, "AttentionIconName", &(data->att_name));
 	data->att_name = get_property_string(proxy, "AttentionIconName");
-	//apply_cached_prop_string(proxy, "AttentionMovieName", &(data->movie_name));
 	data->movie_name = get_property_string(proxy, "AttentionMovieName");
 	//tooltip
 	print_data(data);
