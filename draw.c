@@ -6,6 +6,7 @@
 #include <xcb/xcb_aux.h>
 #include <cairo-xcb.h>
 #include <gdk-pixbuf/gdk-pixbuf.h>
+#include "libgwater/xcb/libgwater-xcb.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -100,6 +101,46 @@ void mon_select(xcb_screen_t *s, xcb_rectangle_t *mon_dim, char *mon_name) {
 	printf("%d %d %d %d\n", mon_dim->x, mon_dim->y, mon_dim->width, mon_dim->height);
 	free(r);
 }
+void conf_win(xcb_screen_t *s, xcb_window_t w, xcb_rectangle_t *dim) {
+	xcb_ewmh_connection_t *ewmh = malloc(sizeof(xcb_ewmh_connection_t));
+	if(!xcb_ewmh_init_atoms_replies(ewmh, xcb_ewmh_init_atoms(c, ewmh), NULL))
+		errx(1, "Failed to initialize EWMH atoms");
+
+	xcb_atom_t test_atom[2] = {ewmh->_NET_WM_STATE_STICKY, ewmh->_NET_WM_STATE_ABOVE};
+	xcb_ewmh_set_wm_state(ewmh, w, 2, test_atom);
+	xcb_ewmh_set_wm_window_type(ewmh, w, 1, &ewmh->_NET_WM_WINDOW_TYPE_DOCK);
+	xcb_ewmh_wm_strut_partial_t strut =
+		{0, 0, dim->height, 0, 0, 0, 0, 0, dim->x, dim->x + dim->width, 0, 0};
+	xcb_ewmh_set_wm_strut(ewmh, w, 0, 0, dim->height, 0);
+	xcb_ewmh_set_wm_strut_partial(ewmh, w, strut);
+
+	// set bspwm windows to be above the bar
+	xcb_query_tree_reply_t *qtree = xcb_query_tree_reply(c, xcb_query_tree(c, s->root), NULL);
+	if(qtree == NULL)
+		errx(1, "Failed to query window tree");
+	xcb_window_t *wins = xcb_query_tree_children(qtree);
+
+	for(int i = 0; i < xcb_query_tree_children_length(qtree); i++) {
+		xcb_window_t found_win = wins[i];
+		// apparently class cannot be a pointer
+		xcb_icccm_get_wm_class_reply_t class;
+		if(xcb_icccm_get_wm_class_reply(c, xcb_icccm_get_wm_class(c, found_win), &class, NULL)) {
+			if(!strcmp("Bspwm", class.class_name) && !strcmp("root", class.instance_name)) {
+				uint32_t stack_mask[2] = {found_win, XCB_STACK_MODE_ABOVE};
+				xcb_configure_window(c, w, XCB_CONFIG_WINDOW_SIBLING | XCB_CONFIG_WINDOW_STACK_MODE, stack_mask);
+			}
+		}
+	}
+
+	free(qtree);
+	/*
+	uint32_t shadow = 0;
+	xcb_change_property(c, XCB_PROP_MODE_REPLACE, w, xcb_get_atom(c, "_COMPTON_SHADOW"), XCB_ATOM_CARDINAL, 32, 1, &shadow);
+	*/
+	xcb_ewmh_connection_wipe(ewmh);
+	free(ewmh);
+
+}
 
 xcb_window_t main_win_init(xcb_screen_t *s, xcb_rectangle_t *dim) {
 	xcb_window_t w = xcb_generate_id(c);
@@ -131,7 +172,7 @@ xcb_window_t main_win_init(xcb_screen_t *s, xcb_rectangle_t *dim) {
 	}
 	char *title = "SNI Tray";
 	xcb_change_property(c, XCB_PROP_MODE_REPLACE, w, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, strlen(title), title);
-	//conf_win(s, w, dim);
+	conf_win(s, w, dim);
 	xcb_map_window(c, w);
 	return w;
 }
@@ -250,17 +291,34 @@ void init_window(win_data *data) {
 
 	xcb_pixmap_t pixmap = xcb_generate_id(c);
 	xcb_gcontext_t gc = xcb_generate_id(c);
-	rgba_t bg = {0x00,0x00,0x00,0xee};
+	rgba_t bg = {0x00,0x00,0x00,0xaa};
 	cairo_reset_surface(data->cr, &bg);
 
 	draw_image(data->cr, "/home/michael/.icons/Flattr Dark/status/24/nm-signal-50.svg");
 }
+gboolean callback(xcb_generic_event_t *event, gpointer user_data) {
+	if(event == NULL) {
+		printf("ruh roh\n");
+		return FALSE;
+	}
+	switch (event->response_type & ~0x80) {
+		case XCB_BUTTON_PRESS:
+			printf("hai dere\n");
+	}
+	xcb_flush(c);
+	return TRUE;
+}
 int main() {
 	win_data data;
 	init_window(&data);
+	GMainLoop *loop;
+	GWaterXcbSource *source;
 
-	xcb_generic_event_t *event;
-	while((event = xcb_wait_for_event(c))) {
-		xcb_flush(c);
-	}
+	loop = g_main_loop_new(NULL, FALSE);
+	source = g_water_xcb_source_new_for_connection(g_main_loop_get_context(loop), c, callback, NULL, NULL);
+
+	g_main_loop_run(loop);
+	g_main_loop_unref(loop);
+
+	g_water_xcb_source_free(source);
 }
