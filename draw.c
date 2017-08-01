@@ -7,6 +7,7 @@
 #include <cairo-xcb.h>
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #include "libgwater/xcb/libgwater-xcb.h"
+#include "draw.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,24 +16,6 @@
 #include <err.h>
 #include <signal.h>
 #include <unistd.h>
-xcb_connection_t *c;
-xcb_visualtype_t *visual;
-xcb_colormap_t colormap;
-uint8_t depth;
-
-typedef struct {
-	uint8_t r, g, b, a;
-} rgba_t;
-
-
-typedef struct win_data {
-	int screen_num;
-	rgba_t bg;
-	cairo_t *cr;
-	xcb_window_t w;
-	xcb_rectangle_t win_dim;
-
-} win_data;
 
 xcb_visualtype_t* visual_type(xcb_screen_t* screen, int match_depth) {
 	xcb_depth_iterator_t depth_iter = xcb_screen_allowed_depths_iterator(screen);
@@ -289,8 +272,8 @@ void init_window(win_data *data) {
 	//cairo_t *cr_buf = cairo_create(buf);
 	data->cr = cairo_create(surface);
 
-	xcb_pixmap_t pixmap = xcb_generate_id(c);
-	xcb_gcontext_t gc = xcb_generate_id(c);
+	//xcb_pixmap_t pixmap = xcb_generate_id(c);
+	//xcb_gcontext_t gc = xcb_generate_id(c);
 	rgba_t bg = {0x00,0x00,0x00,0xaa};
 	cairo_reset_surface(data->cr, &bg);
 
@@ -328,7 +311,7 @@ int main() {
 	GWaterXcbSource *source;
 
 	loop = g_main_loop_new(NULL, FALSE);
-	source = g_water_xcb_source_new_for_connection(g_main_loop_get_context(loop), c, callback, NULL, NULL);
+	source = g_water_xcb_source_new_for_connection(NULL, c, callback, NULL, NULL);
 
 	g_main_loop_run(loop);
 	g_main_loop_unref(loop);

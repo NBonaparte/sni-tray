@@ -5,4 +5,4 @@ test-window: draw.c
 test-water: libgwater/xcb/libgwater-xcb.c draw.c
 	$(CC) -g -o $@ $^ -Wall -lxcb -lxcb-randr -lxcb-util -lxcb-ewmh -lxcb-icccm `pkg-config --cflags --libs cairo gdk-pixbuf-2.0`
 clean:
-	rm sni-tray
+	rm sni-tray test-window test-water
