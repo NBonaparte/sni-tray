@@ -8,6 +8,7 @@
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #include "libgwater/xcb/libgwater-xcb.h"
 #include "draw.h"
+#include "gdbus.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,6 +17,8 @@
 #include <err.h>
 #include <signal.h>
 #include <unistd.h>
+
+static int size = 24;
 
 xcb_visualtype_t* visual_type(xcb_screen_t* screen, int match_depth) {
 	xcb_depth_iterator_t depth_iter = xcb_screen_allowed_depths_iterator(screen);
@@ -84,7 +87,7 @@ void mon_select(xcb_screen_t *s, xcb_rectangle_t *mon_dim, char *mon_name) {
 	printf("%d %d %d %d\n", mon_dim->x, mon_dim->y, mon_dim->width, mon_dim->height);
 	free(r);
 }
-void conf_win(xcb_screen_t *s, xcb_window_t w, xcb_rectangle_t *dim) {
+void conf_win(xcb_screen_t *s, xcb_window_t w) {
 	xcb_ewmh_connection_t *ewmh = malloc(sizeof(xcb_ewmh_connection_t));
 	if(!xcb_ewmh_init_atoms_replies(ewmh, xcb_ewmh_init_atoms(c, ewmh), NULL))
 		errx(1, "Failed to initialize EWMH atoms");
@@ -93,8 +96,8 @@ void conf_win(xcb_screen_t *s, xcb_window_t w, xcb_rectangle_t *dim) {
 	xcb_ewmh_set_wm_state(ewmh, w, 2, test_atom);
 	xcb_ewmh_set_wm_window_type(ewmh, w, 1, &ewmh->_NET_WM_WINDOW_TYPE_DOCK);
 	xcb_ewmh_wm_strut_partial_t strut =
-	{0, 0, dim->height, 0, 0, 0, 0, 0, dim->x, dim->x + dim->width, 0, 0};
-	xcb_ewmh_set_wm_strut(ewmh, w, 0, 0, dim->height, 0);
+	{0, 0, win_dim.height, 0, 0, 0, 0, 0, win_dim.x, win_dim.x + win_dim.width, 0, 0};
+	xcb_ewmh_set_wm_strut(ewmh, w, 0, 0, win_dim.height, 0);
 	xcb_ewmh_set_wm_strut_partial(ewmh, w, strut);
 
 	// set bspwm windows to be above the bar
@@ -125,7 +128,7 @@ void conf_win(xcb_screen_t *s, xcb_window_t w, xcb_rectangle_t *dim) {
 
 }
 
-xcb_window_t main_win_init(xcb_screen_t *s, xcb_rectangle_t *dim) {
+xcb_window_t main_win_init(xcb_screen_t *s) {
 	xcb_window_t w = xcb_generate_id(c);
 
 	depth = XCB_COPY_FROM_PARENT;
@@ -148,14 +151,14 @@ xcb_window_t main_win_init(xcb_screen_t *s, xcb_rectangle_t *dim) {
 	uint32_t mask[] = {s->black_pixel, s->black_pixel, 1, XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_BUTTON_PRESS, colormap};
 
 	if(xcb_request_check(c, xcb_create_window_checked(c, depth, w, s->root,
-					dim->x, dim->y, dim->width, dim->height, 0,
+					win_dim.x, win_dim.y, win_dim.width, win_dim.height, 0,
 					XCB_WINDOW_CLASS_INPUT_OUTPUT, visual->visual_id,
 					XCB_CW_BACK_PIXEL | XCB_CW_BORDER_PIXEL | XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK | XCB_CW_COLORMAP, mask))!= NULL) {
 		errx(1, "dank");
 	}
 	char *title = "SNI Tray";
 	xcb_change_property(c, XCB_PROP_MODE_REPLACE, w, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, strlen(title), title);
-	conf_win(s, w, dim);
+	conf_win(s, w);
 	xcb_map_window(c, w);
 	return w;
 }
@@ -239,24 +242,44 @@ void cairo_reset_surface(cairo_t *cr, rgba_t *bg) {
 	cairo_restore(cr);
 
 }
-void draw_image(cairo_t *dest, char *path) {
+void draw_image(cairo_t *dest, char *path, int x) {
 	cairo_surface_t *kek = image_to_surface(path);
 	//cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
-	cairo_set_source_surface(dest, kek, 0, 0);
+	cairo_set_source_surface(dest, kek, x, 0);
 	cairo_paint(dest);
 	cairo_surface_destroy(kek);
 
 }
+//only supports horizontally oriented tray for now
+void resize_window(guint items) {
+	//or get height and multiply by items
+	uint32_t values[] = {items*size};
+	xcb_configure_window(c, w, XCB_CONFIG_WINDOW_WIDTH, (const uint32_t *) values);
+	cairo_surface_flush(surface);
+	cairo_xcb_surface_set_size(surface, size, values[0]);
+}
+void draw_tray(GList *list) {
+	//iterate through list of data
+	int i = 0;
+	for(GList *l = list; l != NULL; l = l->next, i++) {
+		draw_image(cr, ((ItemData *) l->data)->icon_path, i*size);
+	}
+	//if new width (num of items) !=  current width (win_dim->width), resize window
+	guint w = g_list_length(list);
+
+	if(w*size != win_dim.width)
+		resize_window(w);
+}
 void init_window(win_data *data) {
-	c = xcb_connect(NULL, &(data->screen_num));
+	c = xcb_connect(NULL, &screen_num);
 	xcb_screen_t *s = xcb_setup_roots_iterator(xcb_get_setup(c)).data;
 	uint32_t vals[] = {XCB_EVENT_MASK_PROPERTY_CHANGE};
 	xcb_change_window_attributes(c, s->root, XCB_CW_EVENT_MASK, vals);
 	xcb_rectangle_t mon_dim = {0,0,0,0};
 	mon_select(s, &mon_dim, "HDMI3");
-	data->win_dim = (xcb_rectangle_t){mon_dim.x, mon_dim.y, 24, 24};
+	win_dim = (xcb_rectangle_t){mon_dim.x, mon_dim.y, 24, 24};
 
-	xcb_window_t w = main_win_init(s, &(data->win_dim));
+	w = main_win_init(s);
 
 	/*
 	xcb_pixmap_t buf_pix = xcb_generate_id(c);
@@ -268,17 +291,19 @@ void init_window(win_data *data) {
 	uint8_t depth = xcb_aux_get_depth_of_visual(s, visual->visual_id);
 	cairo_surface_t *buf = cairo_xcb_surface_create(c, buf_pix, visual, win_dim.width, win_dim.height);
 	*/
-	cairo_surface_t *surface = cairo_xcb_surface_create(c, w, visual, data->win_dim.width, data->win_dim.height);
+	surface = cairo_xcb_surface_create(c, w, visual, win_dim.width, win_dim.height);
+	//TODO implement buffer surface
 	//cairo_t *cr_buf = cairo_create(buf);
-	data->cr = cairo_create(surface);
+	cr = cairo_create(surface);
 
 	//xcb_pixmap_t pixmap = xcb_generate_id(c);
 	//xcb_gcontext_t gc = xcb_generate_id(c);
 	rgba_t bg = {0x00,0x00,0x00,0xaa};
-	cairo_reset_surface(data->cr, &bg);
+	cairo_reset_surface(cr, &bg);
 
-	draw_image(data->cr, "/usr/share/icons/Papirus-Dark/24x24/panel/nm-signal-50.svg");
+	draw_image(cr, "/usr/share/icons/Papirus-Dark/24x24/panel/nm-signal-50.svg", 0);
 }
+
 gboolean callback(xcb_generic_event_t *event, gpointer user_data) {
 	if(event == NULL) {
 		printf("ruh roh\n");

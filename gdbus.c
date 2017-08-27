@@ -15,6 +15,7 @@ static gchar host[50] = "org.freedesktop.StatusNotifierHost-";
 static const gchar watcher[] = "org.kde.StatusNotifierWatcher";
 static const gchar watcher_path[] = "/StatusNotifierWatcher";
 //put in ya_bar_t:
+//use g_list_length(list) to find number of elements
 static GList *list = NULL;
 static gchar *theme = NULL;
 //this will be height or something like that
@@ -224,6 +225,8 @@ static void on_name_lost(GDBusConnection *c, const gchar *name, gpointer user_da
 int main() {
 	theme = get_icon_theme();
 	printf("%s\n", theme);
+	gchar *icon = find_icon("nm-signal-50", 24, theme);
+	printf("%s\n", icon);
 	GMainLoop *loop;
 	guint id;
 	sprintf(host + strlen(host), "%ld", (long) getpid());

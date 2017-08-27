@@ -2,9 +2,15 @@
 #include <cairo-xcb.h>
 
 xcb_connection_t *c;
+xcb_window_t w;
 xcb_visualtype_t *visual;
 xcb_colormap_t colormap;
 uint8_t depth;
+int screen_num;
+
+xcb_rectangle_t win_dim;
+cairo_t *cr;
+cairo_surface_t *surface;
 
 typedef struct {
 	uint8_t r, g, b, a;
@@ -12,11 +18,10 @@ typedef struct {
 
 
 typedef struct win_data {
-	int screen_num;
+	//int screen_num;
 	rgba_t bg;
-	cairo_t *cr;
-	xcb_window_t w;
-	xcb_rectangle_t win_dim;
+	//xcb_window_t w;
+	//xcb_rectangle_t win_dim;
 
 } win_data;
 
