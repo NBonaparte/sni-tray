@@ -243,6 +243,7 @@ void cairo_reset_surface(cairo_t *cr, rgba_t *bg) {
 
 }
 void draw_image(cairo_t *dest, char *path, int x) {
+	printf("Drawing %s\n", path);
 	cairo_surface_t *kek = image_to_surface(path);
 	//cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 	cairo_set_source_surface(dest, kek, x, 0);
@@ -258,7 +259,10 @@ void resize_window(guint items) {
 	cairo_surface_flush(surface);
 	cairo_xcb_surface_set_size(surface, size, values[0]);
 }
-void draw_tray(GList *list) {
+//void draw_tray(GList *list) {
+void draw_tray() {
+	rgba_t bg = {0x00,0x00,0x00,0xaa};
+	cairo_reset_surface(cr, &bg);
 	//iterate through list of data
 	int i = 0;
 	for(GList *l = list; l != NULL; l = l->next, i++) {
@@ -270,7 +274,8 @@ void draw_tray(GList *list) {
 	if(w*size != win_dim.width)
 		resize_window(w);
 }
-void init_window(win_data *data) {
+//void init_window(win_data *data) {
+void init_window() {
 	c = xcb_connect(NULL, &screen_num);
 	xcb_screen_t *s = xcb_setup_roots_iterator(xcb_get_setup(c)).data;
 	uint32_t vals[] = {XCB_EVENT_MASK_PROPERTY_CHANGE};
@@ -301,7 +306,7 @@ void init_window(win_data *data) {
 	rgba_t bg = {0x00,0x00,0x00,0xaa};
 	cairo_reset_surface(cr, &bg);
 
-	draw_image(cr, "/usr/share/icons/Papirus-Dark/24x24/panel/nm-signal-50.svg", 0);
+	//draw_image(cr, "/usr/share/icons/Papirus-Dark/24x24/panel/nm-signal-50.svg", 0);
 }
 
 gboolean callback(xcb_generic_event_t *event, gpointer user_data) {
@@ -329,9 +334,11 @@ gboolean callback(xcb_generic_event_t *event, gpointer user_data) {
 	xcb_flush(c);
 	return TRUE;
 }
+/*
 int main() {
-	win_data data;
-	init_window(&data);
+	//win_data data;
+	//init_window(&data);
+	init_window();
 	GMainLoop *loop;
 	GWaterXcbSource *source;
 
@@ -343,3 +350,4 @@ int main() {
 
 	g_water_xcb_source_free(source);
 }
+*/

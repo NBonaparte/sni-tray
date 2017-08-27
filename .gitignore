@@ -41,6 +41,7 @@
 sni-tray
 test-window
 test-water
+test-full
 
 # Debug files
 *.dSYM/

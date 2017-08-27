@@ -1,4 +1,5 @@
 #include "gdbus.h"
+#include "draw.h"
 /* Side advantages:
  * Menus can be used elsewhere
  * Icons can be specified by name, not path
@@ -15,8 +16,7 @@ static gchar host[50] = "org.freedesktop.StatusNotifierHost-";
 static const gchar watcher[] = "org.kde.StatusNotifierWatcher";
 static const gchar watcher_path[] = "/StatusNotifierWatcher";
 //put in ya_bar_t:
-//use g_list_length(list) to find number of elements
-static GList *list = NULL;
+GList *list = NULL;
 static gchar *theme = NULL;
 //this will be height or something like that
 static int size = 24;
@@ -64,6 +64,7 @@ static void on_watch_sig_changed(GDBusProxy *p, gchar *sender_name, gchar *signa
 			l = next;
 		}
 	}
+	draw_tray();
 }
 static gchar * get_property_string(GDBusProxy *p, gchar *prop) {
 	gchar *retstr = NULL;
@@ -84,8 +85,9 @@ static gchar * get_property_string(GDBusProxy *p, gchar *prop) {
 }
 
 static inline void ensure_icon_path(GDBusProxy *p, gchar *icon, gchar **output) {
-	printf("%s %s\n", icon, *output);
-	if((icon != NULL) && (*output == NULL)) {
+	//printf("%s %s\n", icon, *output);
+	//if((icon != NULL) && (*output == NULL)) {
+	if(icon != NULL) {
 		*output = find_icon(icon, size, theme);
 		printf("%s\n", *output);
 	}
@@ -105,7 +107,6 @@ static inline void apply_cached_prop_pixmap(GDBusProxy *p, const gchar *name, gp
 	}
 	output = NULL;
 }
-
 
 static void on_item_sig_changed(GDBusProxy *p, gchar *sender_name, gchar *signal_name,
 		GVariant *param, gpointer user_data) {
@@ -144,6 +145,7 @@ static void on_item_sig_changed(GDBusProxy *p, gchar *sender_name, gchar *signal
 		printf("New status: %s\n", data->status);
 	}
 	g_free(item);
+	draw_tray();
 
 }
 
@@ -173,7 +175,7 @@ static void init_item_data(const gchar *name, const gchar *path, ItemData *data)
 	data->att_name = get_property_string(proxy, "AttentionIconName");
 	data->movie_name = get_property_string(proxy, "AttentionMovieName");
 	//tooltip
-	print_data(data);
+	//print_data(data);
 
 }
 
@@ -205,6 +207,7 @@ static void watcher_appeared_handler(GDBusConnection *c, const gchar *name, cons
 	}
 	g_variant_iter_free(it);
 	g_variant_unref(items);
+	draw_tray();
 
 }
 
@@ -225,14 +228,17 @@ static void on_name_lost(GDBusConnection *c, const gchar *name, gpointer user_da
 int main() {
 	theme = get_icon_theme();
 	printf("%s\n", theme);
-	gchar *icon = find_icon("nm-signal-50", 24, theme);
-	printf("%s\n", icon);
+	//gchar *icon = find_icon("nm-signal-50", 24, theme);
+	//printf("%s\n", icon);
 	GMainLoop *loop;
+	GWaterXcbSource *source;
 	guint id;
 	sprintf(host + strlen(host), "%ld", (long) getpid());
 	printf("name: %s\n", host);
+	init_window();
 
 	loop = g_main_loop_new(NULL, FALSE);
+	source = g_water_xcb_source_new_for_connection(NULL, c, callback, NULL, NULL);
 	id = g_bus_own_name(G_BUS_TYPE_SESSION, (const gchar *) host,
 			G_BUS_NAME_OWNER_FLAGS_NONE, NULL, on_name_acquired, on_name_lost, NULL, NULL);
 
@@ -240,5 +246,6 @@ int main() {
 
 	g_bus_unown_name(id);
 	g_main_loop_unref(loop);
+	g_water_xcb_source_free(source);
 	return 0;
 }

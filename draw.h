@@ -1,5 +1,7 @@
 #include <xcb/xcb.h>
 #include <cairo-xcb.h>
+#include <gio/gio.h>
+#include "libgwater/xcb/libgwater-xcb.h"
 
 xcb_connection_t *c;
 xcb_window_t w;
@@ -25,3 +27,6 @@ typedef struct win_data {
 
 } win_data;
 
+gboolean callback(xcb_generic_event_t *event, gpointer user_data);
+void draw_tray();
+void init_window();

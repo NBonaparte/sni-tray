@@ -33,6 +33,10 @@ typedef struct ItemData {
 	GVariant *obj_path;
 } ItemData;
 
+//use g_list_length(list) to find number of elements
+//GList *list = NULL;
+GList *list;
+
 
 gchar *find_icon(gchar *icon, gint size, gchar *theme);
 gchar *get_icon_theme();
