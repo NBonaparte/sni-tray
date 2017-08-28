@@ -1,9 +1,5 @@
 #include "gdbus.h"
 #include "draw.h"
-/* Side advantages:
- * Menus can be used elsewhere
- * Icons can be specified by name, not path
- */
 static void on_watch_sig_changed(GDBusProxy *p, gchar *sender_name, gchar *signal_name, GVariant *param, gpointer user_data);
 static void on_item_sig_changed(GDBusProxy *p, gchar *sender_name, gchar *signal_name, GVariant *param, gpointer user_data);
 static void init_item_data(const gchar *name, const gchar *path, ItemData *data);
@@ -21,6 +17,30 @@ static gchar *theme = NULL;
 //this will be height or something like that
 static int size = 24;
 
+void call_method(int click_type, int event_x, int event_y, int root_x, int root_y) {
+	printf("Event %d at (%d, %d), root (%d, %d)\n", click_type, event_x, event_y, root_x, root_y);
+	ItemData *i = g_list_nth_data(list, event_x / size);
+	printf("Interacted with %s\n", i->id);
+	// find specific application
+	// call org.kde.StatusNotifierItem.*
+	switch(click_type) {
+		case PRIMARY:
+			g_dbus_proxy_call_sync(i->proxy, "org.kde.StatusNotifierItem.Activate",
+				g_variant_new("(ii)", root_x, root_y), G_DBUS_CALL_FLAGS_NONE, -1, NULL, NULL);
+			break;
+		case SECONDARY:
+			g_dbus_proxy_call_sync(i->proxy, "org.kde.StatusNotifierItem.SecondaryActivate",
+				g_variant_new("(ii)", root_x, root_y), G_DBUS_CALL_FLAGS_NONE, -1, NULL, NULL);
+			break;
+		case CONTEXT:
+			g_dbus_proxy_call_sync(i->proxy, "org.kde.StatusNotifierItem.ContextMenu",
+				g_variant_new("(ii)", root_x, root_y), G_DBUS_CALL_FLAGS_NONE, -1, NULL, NULL);
+			break;
+		case SCROLL:
+		default:
+			printf("lel\n");
+	}
+}
 static void print_data(ItemData *data) {
 	printf("dbus_name: %s\n", data->dbus_name);
 	printf("category: %s\n", data->category);
@@ -157,6 +177,7 @@ static void init_item_data(const gchar *name, const gchar *path, ItemData *data)
 			"org.kde.StatusNotifierItem", NULL, NULL);
 	g_signal_connect(proxy, "g-signal", G_CALLBACK(on_item_sig_changed), data);
 
+	data->proxy = proxy;
 	data->dbus_name = g_strdup(name);
 
 	data->category = get_property_string(proxy, "Category");
@@ -164,7 +185,7 @@ static void init_item_data(const gchar *name, const gchar *path, ItemData *data)
 	data->title = get_property_string(proxy, "Title");
 	data->status = get_property_string(proxy, "Status");
 	//windowid
-	printf("%s\n", get_property_string(proxy, "IconName"));
+	//printf("%s\n", get_property_string(proxy, "IconName"));
 	if((data->icon_name = get_property_string(proxy, "IconName")) != NULL) {
 		printf("%s\n", data->icon_name);
 		ensure_icon_path(proxy, data->icon_name, &(data->icon_path));

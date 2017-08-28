@@ -225,19 +225,20 @@ cairo_surface_t * image_to_surface(char *path) {
 	g_object_unref(gbuf);
 	return ret;
 }
-/*
-cairo_surface_t *draw_pixmap(Pixmap *px) {
+cairo_surface_t *pixmap_to_surface(Pixmap *px) {
 	cairo_surface_t *ret = NULL;
 	//TODO check cairo format
-	ret = cairo_image_surface_create_for_data(px->pixmap, CAIRO_FORMAT_ARGB32, px->width, px->height,
+	unsigned char *data = (unsigned char *) g_bytes_get_data(px->pixmap, NULL);
+	//ret = cairo_image_surface_create_for_data(px->pixmap, CAIRO_FORMAT_ARGB32, px->width, px->height,
+	ret = cairo_image_surface_create_for_data(data, CAIRO_FORMAT_ARGB32, px->width, px->height,
 	cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, px->width));
 	return ret;
 }
-*/
-void cairo_reset_surface(cairo_t *cr, rgba_t *bg) {
+//void cairo_reset_surface(cairo_t *cr, rgba_t *bg) {
+void cairo_reset_surface(cairo_t *cr) {
 	cairo_save(cr);
 	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
-	cairo_set_source_rgba(cr, bg->r/255.0, bg->g/255.0, bg->b/255.0, bg->a/255.0);
+	cairo_set_source_rgba(cr, bg.r/255.0, bg.g/255.0, bg.b/255.0, bg.a/255.0);
 	cairo_paint(cr);
 	cairo_restore(cr);
 
@@ -251,8 +252,15 @@ void draw_image(cairo_t *dest, char *path, int x) {
 	cairo_surface_destroy(kek);
 
 }
+void draw_pixmap(cairo_t *dest, Pixmap *px, int x) {
+	cairo_surface_t *lol = pixmap_to_surface(px);
+	cairo_set_source_surface(dest, lol, x, 0);
+	cairo_paint(dest);
+	cairo_surface_destroy(lol);
+}
 //only supports horizontally oriented tray for now
 void resize_window(guint items) {
+	printf("resizing width to %d\n", items*size);
 	//or get height and multiply by items
 	uint32_t values[] = {items*size};
 	xcb_configure_window(c, w, XCB_CONFIG_WINDOW_WIDTH, (const uint32_t *) values);
@@ -261,16 +269,20 @@ void resize_window(guint items) {
 }
 //void draw_tray(GList *list) {
 void draw_tray() {
-	rgba_t bg = {0x00,0x00,0x00,0xaa};
-	cairo_reset_surface(cr, &bg);
+	//rgba_t bg = {0x00,0x00,0x00,0xaa};
+	cairo_reset_surface(cr);
 	//iterate through list of data
 	int i = 0;
 	for(GList *l = list; l != NULL; l = l->next, i++) {
-		draw_image(cr, ((ItemData *) l->data)->icon_path, i*size);
+		// if icon path is specified
+		if(((ItemData *) l->data)->icon_path != NULL)
+			draw_image(cr, ((ItemData *) l->data)->icon_path, i*size);
+		//else if (((ItemData *) l->data)->icon_pixmap != NULL)
+		//	draw_pixmap(cr, ((ItemData *) l->data)->icon_pixmap, i*size);
+
 	}
 	//if new width (num of items) !=  current width (win_dim->width), resize window
 	guint w = g_list_length(list);
-
 	if(w*size != win_dim.width)
 		resize_window(w);
 }
@@ -303,8 +315,8 @@ void init_window() {
 
 	//xcb_pixmap_t pixmap = xcb_generate_id(c);
 	//xcb_gcontext_t gc = xcb_generate_id(c);
-	rgba_t bg = {0x00,0x00,0x00,0xaa};
-	cairo_reset_surface(cr, &bg);
+	bg = (rgba_t){0x00,0x00,0x00,0xaa};
+	cairo_reset_surface(cr);
 
 	//draw_image(cr, "/usr/share/icons/Papirus-Dark/24x24/panel/nm-signal-50.svg", 0);
 }
@@ -317,18 +329,18 @@ gboolean callback(xcb_generic_event_t *event, gpointer user_data) {
 	switch (event->response_type & ~0x80) {
 		case XCB_BUTTON_PRESS: {
 			xcb_button_press_event_t *bp = (xcb_button_press_event_t *)event;
+			/*
 			switch(bp->detail) {
 				// use event_x/y to determine which item was clicked, and use root_x/y as args
 				// for item methods
-				case 1:	//do primary click event (Activate)
-				case 2:	//do middle click event (SecondaryActivate)
-				case 3:	//do right click event (ContextMenu)
-				case 4:
-				case 5:	//scroll stuff (need to determine "delta" of scroll, use time/amount?
+				case PRIMARY:	//do primary click event (Activate)
+				case SECONDARY:	//do middle click event (SecondaryActivate)
+				case CONTEXT:	//do right click event (ContextMenu)
+				case SCROLL:	//scroll stuff (need to determine "delta" of scroll, use time/amount?
 				default:
-					printf("hi :3\n");
 			}
-			printf("%d pressed at %d, %d\n", bp->detail, bp->event_x, bp->event_y);
+			*/
+			call_method(bp->detail, bp->event_x, bp->event_y, bp->root_x, bp->event_y);
 		}
 	}
 	xcb_flush(c);

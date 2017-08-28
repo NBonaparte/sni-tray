@@ -14,6 +14,7 @@ typedef struct Pixmap {
 } Pixmap;
 //struct to hold all properties for item
 typedef struct ItemData {
+	GDBusProxy *proxy;
 	gchar *dbus_name;
 	gchar *category;
 	gchar *id;
@@ -34,7 +35,6 @@ typedef struct ItemData {
 } ItemData;
 
 //use g_list_length(list) to find number of elements
-//GList *list = NULL;
 GList *list;
 
 

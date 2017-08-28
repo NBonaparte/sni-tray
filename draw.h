@@ -18,15 +18,15 @@ typedef struct {
 	uint8_t r, g, b, a;
 } rgba_t;
 
+rgba_t bg;
 
-typedef struct win_data {
-	//int screen_num;
-	rgba_t bg;
-	//xcb_window_t w;
-	//xcb_rectangle_t win_dim;
-
-} win_data;
-
+enum click_type {
+	PRIMARY = 1,
+	SECONDARY,
+	CONTEXT,
+	UNUSED,
+	SCROLL
+};
 gboolean callback(xcb_generic_event_t *event, gpointer user_data);
 void draw_tray();
 void init_window();
